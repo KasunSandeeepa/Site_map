@@ -130,9 +130,10 @@ function updateRtomFilter() {
   const region = document.getElementById("regionFilter").value
   const rtomSelect = document.getElementById("rtomSelect")
 
+  rtomSelect.value = "All"
+
   if (region === "All") {
     rtomSelect.style.display = "none"
-    rtomSelect.value = "All"
     return
   }
 
@@ -151,8 +152,6 @@ function updateRtomFilter() {
     option.textContent = rtom
     rtomSelect.appendChild(option)
   })
-
-  rtomSelect.value = "All"
 }
 
 // ============================
@@ -246,15 +245,31 @@ function updateMarkers() {
   const mode = document.getElementById("colorMode").value
   const legendContent = document.getElementById("legend-content")
 
+  console.log("[v0] updateMarkers - Region:", region, "RTOM:", rtom, "Mode:", mode)
+
   legendContent.innerHTML = generateLegendHtml(mode)
 
   allSites.forEach((site) => {
     const siteRegion = (site.Sales_Region || "").trim()
     const siteRtom = (site.RTOM || "").trim()
 
-    if (region !== "All" && siteRegion !== region) return
-    if (rtom !== "All" && siteRtom !== rtom) return
-    if (!site.Lat || !site.Lon) return
+    // If region filter is not "All", check if site belongs to that region
+    if (region !== "All" && siteRegion !== region) {
+      console.log("[v0] Filtering out site - region mismatch:", siteRegion, "vs", region)
+      return
+    }
+
+    // If rtom filter is not "All", check if site belongs to that rtom
+    if (rtom !== "All" && siteRtom !== rtom) {
+      console.log("[v0] Filtering out site - RTOM mismatch:", siteRtom, "vs", rtom)
+      return
+    }
+
+    // If no coordinates, skip
+    if (!site.Lat || !site.Lon) {
+      console.log("[v0] Filtering out site - no coordinates:", site.eNodeB_Name)
+      return
+    }
 
     const color = getMarkerColor(site, mode)
     const marker = L.circleMarker([site.Lat, site.Lon], {
@@ -306,6 +321,8 @@ function updateMarkers() {
     markers.push(marker)
   })
 
+  console.log("[v0] Total markers displayed:", markers.length)
+
   if (markers.length > 0) {
     const group = L.featureGroup(markers)
     map.fitBounds(group.getBounds().pad(0.2))
@@ -330,6 +347,7 @@ document.getElementById("regionFilter").addEventListener("change", () => {
 })
 
 document.getElementById("rtomSelect").addEventListener("change", () => {
+  console.log("[v0] RTOM changed to:", document.getElementById("rtomSelect").value)
   updateMarkers()
   updateUtilityTable()
 })
@@ -365,6 +383,8 @@ function updateUtilityTable() {
       const isRtom = payload.is_rtom
       const rtomBreakdown = payload.rtom_breakdown
 
+      console.log("[v0] Utility stats received - isRtom:", isRtom, "stats:", stats)
+
       tbody.innerHTML = ""
 
       const headerRow = table.querySelector("thead tr")
@@ -373,11 +393,12 @@ function updateUtilityTable() {
       }
 
       let titleText = "Site Utility Distribution"
+      const metricLabel = metric === "traffic" ? "(Traffic)" : "(User Count)"
+
       if (rtom !== "All") {
-        const metricLabel = metric === "traffic" ? "(Traffic)" : "(User Count)"
         titleText = `Site Utility Distribution - ${rtom} ${metricLabel}`
-      } else if (metric === "users") {
-        titleText = "Site Utility Distribution (User Count)"
+      } else if (region !== "All") {
+        titleText = `Site Utility Distribution - ${region} ${metricLabel}`
       }
       titleDiv.textContent = titleText
 
@@ -409,7 +430,7 @@ function updateUtilityTable() {
           const cell = document.createElement("td")
           let value = "-"
 
-          if (r === region && stats[r]) {
+          if (stats[r]) {
             value = stats[r][level.key] + "%"
           } else if (rtomBreakdown && rtomBreakdown[r]) {
             value = rtomBreakdown[r][level.key] + "%"

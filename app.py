@@ -144,11 +144,13 @@ def get_utility_stats():
                 low = sum(1 for s in rtom_sites if s.get('User_Count') and s.get('User_Count') < 40)
             
             total = high + avg + low
+            
             stats = {
                 rtom_filter: {
                     'high': round((high / total * 100) if total > 0 else 0, 1),
                     'avg': round((avg / total * 100) if total > 0 else 0, 1),
                     'low': round((low / total * 100) if total > 0 else 0, 1),
+                    'total_sites': total
                 }
             }
             return jsonify({'success': True, 'regions': [rtom_filter], 'stats': stats, 'is_rtom': True, 'rtom_breakdown': None})
