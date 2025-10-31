@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>SLT Mobitel Sites — Sri Lanka Map</title>
+
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+  crossorigin=""
+/>
+
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; }
+  
+  .controls { 
+    display: flex; 
+    gap: 12px; 
+    align-items: center; 
+    padding: 8px 12px;
+    background: #f5f5f5; 
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    height: 44px;
+    justify-content: space-between;
+  }
+
+  .controls-left {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .controls-right {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .admin-info {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 13px;
+    color: #666;
+    padding: 0 12px;
+    border-left: 1px solid #ddd;
+  }
+
+  .admin-badge {
+    background: #667eea;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .logout-btn {
+    padding: 6px 12px;
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .logout-btn:hover {
+    background: #dc2626;
+  }
+  
+  #map { 
+    height: calc(100vh - 44px); 
+    width: 100%; 
+  }
+
+  table.site-table { border-collapse: collapse; width: 100%; }
+  table.site-table th, table.site-table td { border:1px solid #ddd; padding:8px; font-size:14px; }
+
+  .leaflet-popup-content {
+    width: 600px !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .legend {
+    position: fixed;
+    top: 60px;
+    right: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: white;
+    padding: 12px;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    z-index: 1000;
+  }
+
+  #legend-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: #333;
+  }
+
+  .legend-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+
+  .legend-dot.green { background-color: #22c55e; }
+  .legend-dot.yellow { background-color: #eab308; border: 1px solid #999; }
+  .legend-dot.red { background-color: #ef4444; }
+
+  .legend-title {
+    font-weight: 600;
+    font-size: 13px;
+    color: #222;
+    margin-bottom: 4px;
+  }
+
+  .utility-table-container {
+    position: fixed;
+    bottom: 12px;
+    left: 12px;
+    background: white;
+    padding: 12px;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    z-index: 1000;
+    max-width: 500px;
+  }
+
+  .utility-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13px;
+  }
+
+  .utility-table th, .utility-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: center;
+  }
+
+  .utility-table th {
+    background: #f0f0f0;
+    font-weight: 600;
+    color: #333;
+  }
+
+  .utility-table td:first-child {
+    text-align: left;
+    font-weight: 500;
+  }
+
+  .utility-table .high { background-color: #dcfce7; color: #166534; }
+  .utility-table .avg { background-color: #fef3c7; color: #92400e; }
+  .utility-table .low { background-color: #fee2e2; color: #991b1b; }
+  
+  .utility-table .total { background-color: #e5e7eb; color: #1f2937; font-weight: 600; }
+
+  .utility-table-title {
+    font-weight: 600;
+    font-size: 13px;
+    margin-bottom: 8px;
+    color: #222;
+  }
+</style>
+</head>
+<body>
+<div class="controls">
+  <div class="controls-left">
+    <label for="regionFilter"><strong>Sales Region</strong></label>
+    <!-- Region dropdown now has id for access control -->
+    <select id="regionFilter">
+      <option value="All">All</option>
+      <option value="Metro">Metro</option>
+      <option value="Region 1">Region 1</option>
+      <option value="Region 2">Region 2</option>
+      <option value="Region 3">Region 3</option>
+    </select>
+
+    <label for="rtomSelect"><strong>RTOM</strong></label>
+    <select id="rtomSelect" style="display: none;">
+      <option value="All">All RTOMs</option>
+    </select>
+
+    <label for="colorMode"><strong>Color by</strong></label>
+    <select id="colorMode">
+      <option value="traffic">Traffic (TB)</option>
+      <option value="users">User Count</option>
+    </select>
+  </div>
+
+  <div class="controls-right">
+    <div class="admin-info">
+      <span id="adminUsername">Loading...</span>
+      <span class="admin-badge" id="adminRole">-</span>
+    </div>
+    <button class="logout-btn" onclick="logout()">Logout</button>
+  </div>
+</div>
+
+<div id="legend" class="legend">
+  <div id="legend-content"></div>
+</div>
+
+<div id="utilityTableContainer" class="utility-table-container">
+  <div class="utility-table-title">Site Utility Distribution</div>
+  <table id="utilityTable" class="utility-table">
+    <thead>
+      <tr>
+        <th>Utility Level</th>
+        <th id="col-header-0">Region</th>
+      </tr>
+    </thead>
+    <tbody id="utilityTableBody">
+    </tbody>
+  </table>
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="/static/script.js"></script>
+</body>
+</html>
