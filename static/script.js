@@ -1,9 +1,11 @@
 // ============================
+// Admin Info & Authentication
 // ============================
 function loadAdminInfo() {
   fetch("/get_admin_info")
     .then((r) => r.json())
     .then((payload) => {
+      console.log("[v0] Admin info response:", payload)
       if (!payload.success) {
         window.location.href = "/login"
         return
@@ -13,7 +15,6 @@ function loadAdminInfo() {
       const role = payload.role
       const region = payload.region
 
-      // Display admin info
       const adminUsernameEl = document.getElementById("adminUsername")
       const adminRoleEl = document.getElementById("adminRole")
 
@@ -25,7 +26,6 @@ function loadAdminInfo() {
       if (role === "region_admin" && region) {
         regionFilter.value = region
         regionFilter.disabled = true
-        // Trigger update to show only the admin's region
         updateRtomFilter()
         updateMarkers()
         updateUtilityTable()
@@ -41,18 +41,17 @@ function logout() {
   window.location.href = "/logout"
 }
 
-// Load admin info on page load
 loadAdminInfo()
 
 // ============================
-// Sri Lanka Map Boundaries
+// Map Setup
 // ============================
 const sriLankaBounds = [
   [5.85, 79.65],
   [9.85, 81.95],
 ]
 
-const L = window.L // Declare the L variable before using it
+const L = window.L
 const map = L.map("map", {
   maxBounds: sriLankaBounds,
   maxBoundsViscosity: 0.9,
@@ -67,6 +66,9 @@ let allSites = []
 let markers = []
 let allCities = []
 let utilityStats = {}
+let trafficChart = null
+let userChart = null
+let currentSiteId = null
 
 // ============================
 // Data Loading
@@ -75,49 +77,42 @@ fetch("/get_sites")
   .then((r) => r.json())
   .then((payload) => {
     if (!payload.success) {
-      alert("Failed to load data")
+      alert("Failed to load data: " + (payload.error || "Unknown error"))
       return
     }
     allSites = payload.sites || []
+    console.log("[v0] Loaded", allSites.length, "sites")
     updateMarkers()
   })
   .catch((err) => {
-    console.error(err)
-    alert("Error loading data")
+    console.error("[v0] Fetch error:", err)
+    alert("Error loading data: " + err.message)
   })
 
 fetch("/get_cities")
   .then((r) => r.json())
   .then((payload) => {
-    if (!payload.success) {
-      console.error("Failed to load cities")
-      return
-    }
+    if (!payload.success) return
     allCities = payload.cities || []
     populateRtomFilter()
   })
-  .catch((err) => {
-    console.error("Error loading cities:", err)
-  })
+  .catch((err) => console.error("[v0] Cities error:", err))
 
 fetch("/get_utility_stats")
   .then((r) => r.json())
   .then((payload) => {
-    if (!payload.success) {
-      console.error("Failed to load utility stats")
-      return
-    }
+    if (!payload.success) return
     utilityStats = payload
     updateUtilityTable()
   })
-  .catch((err) => {
-    console.error("Error loading utility stats:", err)
-  })
+  .catch((err) => console.error("[v0] Stats error:", err))
 
+// ============================
+// Helper Functions
+// ============================
 function populateRtomFilter() {
   const rtomSelect = document.getElementById("rtomSelect")
   rtomSelect.innerHTML = '<option value="All">All RTOMs</option>'
-
   allCities.forEach((city) => {
     const option = document.createElement("option")
     option.value = city
@@ -129,7 +124,6 @@ function populateRtomFilter() {
 function updateRtomFilter() {
   const region = document.getElementById("regionFilter").value
   const rtomSelect = document.getElementById("rtomSelect")
-
   rtomSelect.value = "All"
 
   if (region === "All") {
@@ -138,7 +132,6 @@ function updateRtomFilter() {
   }
 
   rtomSelect.style.display = "block"
-
   const regionRtoms = allSites
     .filter((site) => (site.Sales_Region || "").trim() === region)
     .map((site) => site.RTOM)
@@ -154,9 +147,6 @@ function updateRtomFilter() {
   })
 }
 
-// ============================
-// Utility Functions
-// ============================
 function toFixedSafe(x, d = 2) {
   return x === null || x === undefined || isNaN(x) ? "-" : Number(x).toFixed(d)
 }
@@ -181,34 +171,16 @@ function generateLegendHtml(mode) {
   if (mode === "traffic") {
     return `
       <div class="legend-title">Legend: Traffic (TB)</div>
-      <div class="legend-item">
-        <div class="legend-dot green"></div>
-        <span>&gt;4 TB</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-dot yellow"></div>
-        <span>2–4 TB</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-dot red"></div>
-        <span>&lt;2 TB</span>
-      </div>
+      <div class="legend-item"><div class="legend-dot green"></div><span>&gt;4 TB</span></div>
+      <div class="legend-item"><div class="legend-dot yellow"></div><span>2–4 TB</span></div>
+      <div class="legend-item"><div class="legend-dot red"></div><span>&lt;2 TB</span></div>
     `
   } else {
     return `
       <div class="legend-title">Legend: User Count</div>
-      <div class="legend-item">
-        <div class="legend-dot green"></div>
-        <span>&gt;80</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-dot yellow"></div>
-        <span>40–80</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-dot red"></div>
-        <span>&lt;40</span>
-      </div>
+      <div class="legend-item"><div class="legend-dot green"></div><span>&gt;80</span></div>
+      <div class="legend-item"><div class="legend-dot yellow"></div><span>40–80</span></div>
+      <div class="legend-item"><div class="legend-dot red"></div><span>&lt;40</span></div>
     `
   }
 }
@@ -234,8 +206,205 @@ function clearMarkers() {
   markers = []
 }
 
+function destroyCharts() {
+  if (trafficChart) {
+    trafficChart.destroy()
+    trafficChart = null
+  }
+  if (userChart) {
+    userChart.destroy()
+    userChart = null
+  }
+}
+
 // ============================
-// Marker & Popup Logic
+// Trend Loading (In Sidebar)
+// ============================
+async function loadAndDisplayTrends(site) {
+  try {
+    const normalizedId = String(site.eNodeB_ID).trim()
+    
+    // Prevent reloading same site
+    if (currentSiteId === normalizedId && trafficChart && userChart) {
+      console.log("[v0] Same site, skipping reload")
+      return
+    }
+    
+    currentSiteId = normalizedId
+    console.log("[v0] Loading trends for:", normalizedId, site.eNodeB_Name)
+
+    // Destroy existing charts
+    destroyCharts()
+
+    // Update sidebar title
+    const trendsSection = document.getElementById("trendsSection")
+    const trendsSiteTitle = document.getElementById("trendsSiteTitle")
+    trendsSiteTitle.textContent = site.eNodeB_Name || "Unknown Site"
+    trendsSection.style.display = "block"
+
+    // Show loading state
+    const trendsContainer = document.getElementById("trendsContainer")
+    trendsContainer.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Loading trends...</p>'
+
+    const response = await fetch(`/get_site_trends/${normalizedId}`)
+    const data = await response.json()
+
+    console.log("[v0] Response:", {
+      success: data.success,
+      traffic: data.traffic_trend?.length || 0,
+      users: data.user_trend?.length || 0
+    })
+
+    if (!data.success) {
+      trendsContainer.innerHTML = `<p style="text-align: center; color: #ef4444; padding: 20px; font-size: 13px;">${data.error || "No trend data"}</p>`
+      return
+    }
+
+    const hasTraffic = data.traffic_trend && data.traffic_trend.length > 0
+    const hasUsers = data.user_trend && data.user_trend.length > 0
+
+    if (!hasTraffic && !hasUsers) {
+      trendsContainer.innerHTML = `<p style="text-align: center; color: #999; padding: 20px; font-size: 13px;">No trend data available</p>`
+      return
+    }
+
+    // Build HTML for charts
+    let html = ''
+    
+    if (hasTraffic) {
+      html += `
+        <div style="margin-bottom: 20px;">
+          <h5 style="font-size: 13px; font-weight: 600; color: #60a5fa; margin-bottom: 10px;">Traffic Trend (GB)</h5>
+          <div style="position: relative; height: 180px;">
+            <canvas id="sidebarTrafficChart"></canvas>
+          </div>
+        </div>
+      `
+    }
+
+    if (hasUsers) {
+      html += `
+        <div>
+          <h5 style="font-size: 13px; font-weight: 600; color: #10b981; margin-bottom: 10px;">User Count Trend</h5>
+          <div style="position: relative; height: 180px;">
+            <canvas id="sidebarUserChart"></canvas>
+          </div>
+        </div>
+      `
+    }
+
+    trendsContainer.innerHTML = html
+
+    // Wait for DOM
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Create traffic chart
+    if (hasTraffic) {
+      const ctx = document.getElementById("sidebarTrafficChart")
+      if (ctx) {
+        trafficChart = new window.Chart(ctx, {
+          type: "line",
+          data: {
+            labels: data.traffic_trend.map(d => d.period),
+            datasets: [{
+              label: "Traffic (GB)",
+              data: data.traffic_trend.map(d => d.value),
+              borderColor: "#60a5fa",
+              backgroundColor: "rgba(96, 165, 250, 0.1)",
+              tension: 0.3,
+              fill: true,
+              pointRadius: 3,
+              pointBackgroundColor: "#60a5fa",
+              borderWidth: 2,
+            }],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                grid: { color: "rgba(51, 65, 85, 0.3)" },
+                ticks: { color: "#94a3b8", font: { size: 10 } },
+              },
+              x: {
+                grid: { display: false },
+                ticks: { 
+                  color: "#94a3b8", 
+                  font: { size: 9 }, 
+                  maxRotation: 45,
+                  minRotation: 45
+                },
+              },
+            },
+          },
+        })
+        console.log("[v0] Traffic chart created")
+      }
+    }
+
+    // Create user chart
+    if (hasUsers) {
+      const ctx = document.getElementById("sidebarUserChart")
+      if (ctx) {
+        userChart = new window.Chart(ctx, {
+          type: "line",
+          data: {
+            labels: data.user_trend.map(d => d.period),
+            datasets: [{
+              label: "User Count",
+              data: data.user_trend.map(d => d.value),
+              borderColor: "#10b981",
+              backgroundColor: "rgba(16, 185, 129, 0.1)",
+              tension: 0.3,
+              fill: true,
+              pointRadius: 3,
+              pointBackgroundColor: "#10b981",
+              borderWidth: 2,
+            }],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                grid: { color: "rgba(51, 65, 85, 0.3)" },
+                ticks: { color: "#94a3b8", font: { size: 10 } },
+              },
+              x: {
+                grid: { display: false },
+                ticks: { 
+                  color: "#94a3b8", 
+                  font: { size: 9 }, 
+                  maxRotation: 45,
+                  minRotation: 45
+                },
+              },
+            },
+          },
+        })
+        console.log("[v0] User chart created")
+      }
+    }
+
+  } catch (err) {
+    console.error("[v0] Error:", err)
+    const trendsContainer = document.getElementById("trendsContainer")
+    if (trendsContainer) {
+      trendsContainer.innerHTML = `<p style="text-align: center; color: #ef4444; padding: 20px; font-size: 13px;">Error: ${err.message}</p>`
+    }
+  }
+}
+
+// ============================
+// Marker Updates
 // ============================
 function updateMarkers() {
   clearMarkers()
@@ -245,31 +414,15 @@ function updateMarkers() {
   const mode = document.getElementById("colorMode").value
   const legendContent = document.getElementById("legend-content")
 
-  console.log("[v0] updateMarkers - Region:", region, "RTOM:", rtom, "Mode:", mode)
-
   legendContent.innerHTML = generateLegendHtml(mode)
 
   allSites.forEach((site) => {
     const siteRegion = (site.Sales_Region || "").trim()
     const siteRtom = (site.RTOM || "").trim()
 
-    // If region filter is not "All", check if site belongs to that region
-    if (region !== "All" && siteRegion !== region) {
-      console.log("[v0] Filtering out site - region mismatch:", siteRegion, "vs", region)
-      return
-    }
-
-    // If rtom filter is not "All", check if site belongs to that rtom
-    if (rtom !== "All" && siteRtom !== rtom) {
-      console.log("[v0] Filtering out site - RTOM mismatch:", siteRtom, "vs", rtom)
-      return
-    }
-
-    // If no coordinates, skip
-    if (!site.Lat || !site.Lon) {
-      console.log("[v0] Filtering out site - no coordinates:", site.eNodeB_Name)
-      return
-    }
+    if (region !== "All" && siteRegion !== region) return
+    if (rtom !== "All" && siteRtom !== rtom) return
+    if (!site.Lat || !site.Lon) return
 
     const color = getMarkerColor(site, mode)
     const marker = L.circleMarker([site.Lat, site.Lon], {
@@ -280,61 +433,137 @@ function updateMarkers() {
       fillOpacity: 0.9,
     })
 
+    // Smaller popup - no trends
     const popupHtml = `
-      <div style="min-width: 600px">
-        <h4 style="margin: 6px 0;">${escapeHtml(site.eNodeB_Name || "")}</h4>
-        <div><b>ID:</b> ${escapeHtml(String(site.eNodeB_ID || "-"))}</div>
-        <div><b>Sales Region:</b> ${escapeHtml(String(site.Sales_Region || "-"))}</div>
-        <div><b>RTOM:</b> ${escapeHtml(String(site.RTOM || "-"))}</div>
-        <div><b>Monthly Total Traffic:</b> ${site.Monthly_Traffic_Total_TB ? toFixedSafe(site.Monthly_Traffic_Total_TB, 2) + " TB" : "-"}</div>
-        <div><b>User Count:</b> ${site.User_Count || "-"}</div>
-        <hr/>
-        <table class="site-table">
+      <div style="width: 400px; max-width: 90vw;">
+        <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #334155;">
+          <h4 style="font-size: 15px; font-weight: 700; color: #60a5fa; margin-bottom: 8px;">${escapeHtml(site.eNodeB_Name || "")}</h4>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; color: #cbd5e1;">
+            <div><b style="color: #94a3b8;">ID:</b> ${escapeHtml(String(site.eNodeB_ID || "-"))}</div>
+            <div><b style="color: #94a3b8;">Region:</b> ${escapeHtml(String(site.Sales_Region || "-"))}</div>
+            <div><b style="color: #94a3b8;">RTOM:</b> ${escapeHtml(String(site.RTOM || "-"))}</div>
+            <div><b style="color: #94a3b8;">Traffic:</b> ${site.Monthly_Traffic_Total_TB ? toFixedSafe(site.Monthly_Traffic_Total_TB, 2) + " TB" : "-"}</div>
+          </div>
+        </div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
           <thead>
-            <tr>
-              <th>Name</th>
-              <th>DL (GB)</th>
-              <th>UL (GB)</th>
-              <th>Total (GB)</th>
-              <th>Bandwidth</th>
-              <th>User Count</th>
-              <th>Avg DL (Mbps)</th>
+            <tr style="background: #0f172a;">
+              <th style="padding: 6px; text-align: left; color: #94a3b8; font-size: 10px; text-transform: uppercase;">Metric</th>
+              <th style="padding: 6px; text-align: right; color: #94a3b8; font-size: 10px; text-transform: uppercase;">Value</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td>${escapeHtml(site.eNodeB_Name || "")}</td>
-              <td>${formatNum(site.Monthly_Traffic_DL_GB)}</td>
-              <td>${formatNum(site.Monthly_Traffic_UL_GB)}</td>
-              <td>${formatNum(site.Monthly_Traffic_Total_GB)}</td>
-              <td>${escapeHtml(String(site.Bandwidth || "-"))}</td>
-              <td>${site.User_Count || "-"}</td>
-              <td>${formatNum(site.Avg_DL_Throughput_Mbps)}</td>
+              <td style="padding: 6px; border-bottom: 1px solid #334155; color: #cbd5e1;">DL (GB)</td>
+              <td style="padding: 6px; border-bottom: 1px solid #334155; color: #cbd5e1; text-align: right;">${formatNum(site.Monthly_Traffic_DL_GB)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px; border-bottom: 1px solid #334155; color: #cbd5e1;">UL (GB)</td>
+              <td style="padding: 6px; border-bottom: 1px solid #334155; color: #cbd5e1; text-align: right;">${formatNum(site.Monthly_Traffic_UL_GB)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px; border-bottom: 1px solid #334155; color: #cbd5e1;">Total (GB)</td>
+              <td style="padding: 6px; border-bottom: 1px solid #334155; color: #cbd5e1; text-align: right;">${formatNum(site.Monthly_Traffic_Total_GB)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px; border-bottom: 1px solid #334155; color: #cbd5e1;">Bandwidth</td>
+              <td style="padding: 6px; border-bottom: 1px solid #334155; color: #cbd5e1; text-align: right;">${escapeHtml(String(site.Bandwidth || "-"))}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px; border-bottom: 1px solid #334155; color: #cbd5e1;">User Count</td>
+              <td style="padding: 6px; border-bottom: 1px solid #334155; color: #cbd5e1; text-align: right;">${site.User_Count || "-"}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px; color: #cbd5e1;">Avg DL (Mbps)</td>
+              <td style="padding: 6px; color: #cbd5e1; text-align: right;">${formatNum(site.Avg_DL_Throughput_Mbps)}</td>
             </tr>
           </tbody>
         </table>
       </div>
     `
 
-    marker.bindPopup(popupHtml)
+    const popup = L.popup({ 
+      maxWidth: 450,
+      closeButton: true
+    }).setContent(popupHtml)
+    
+    marker.bindPopup(popup)
+
+    // Load trends in sidebar when marker is clicked
+    marker.on("click", () => {
+      console.log("[v0] Marker clicked:", site.eNodeB_Name)
+      loadAndDisplayTrends(site)
+    })
+
     marker.addTo(map)
     markers.push(marker)
   })
 
-  console.log("[v0] Total markers displayed:", markers.length)
+  console.log("[v0] Displayed", markers.length, "markers")
 
   if (markers.length > 0) {
     const group = L.featureGroup(markers)
     map.fitBounds(group.getBounds().pad(0.2))
-
-    if (map.getZoom() > 12) {
-      map.setZoom(12)
-    }
+    if (map.getZoom() > 12) map.setZoom(12)
   } else {
     map.setView([7.8731, 80.7718], 8)
   }
 
   map.setMaxBounds(sriLankaBounds)
+}
+
+// ============================
+// Utility Table
+// ============================
+function updateUtilityTable() {
+  const tableBody = document.querySelector("#utilityTable tbody")
+  tableBody.innerHTML = ""
+
+  const region = document.getElementById("regionFilter").value
+  const rtom = document.getElementById("rtomSelect").value
+  const mode = document.getElementById("colorMode").value
+
+  let filteredSites = allSites
+  if (region !== "All") {
+    filteredSites = filteredSites.filter((s) => (s.Sales_Region || "").trim() === region)
+  }
+  if (rtom !== "All") {
+    filteredSites = filteredSites.filter((s) => (s.RTOM || "").trim() === rtom)
+  }
+
+  let high = 0, avg = 0, low = 0
+  filteredSites.forEach((site) => {
+    const color = getMarkerColor(site, mode)
+    if (color === "green") high++
+    else if (color === "yellow") avg++
+    else if (color === "red") low++
+  })
+
+  const total = high + avg + low
+  const highPct = total > 0 ? ((high / total) * 100).toFixed(1) : 0
+  const avgPct = total > 0 ? ((avg / total) * 100).toFixed(1) : 0
+  const lowPct = total > 0 ? ((low / total) * 100).toFixed(1) : 0
+
+  const rows = [
+    { level: "High", count: high, pct: highPct, color: "high" },
+    { level: "Average", count: avg, pct: avgPct, color: "avg" },
+    { level: "Low", count: low, pct: lowPct, color: "low" },
+  ]
+
+  rows.forEach((row) => {
+    const tr = document.createElement("tr")
+    const levelTd = document.createElement("td")
+    levelTd.textContent = row.level
+    levelTd.style.textAlign = "left"
+
+    const countTd = document.createElement("td")
+    countTd.textContent = `${row.count} (${row.pct}%)`
+    countTd.className = row.color
+
+    tr.appendChild(levelTd)
+    tr.appendChild(countTd)
+    tableBody.appendChild(tr)
+  })
 }
 
 // ============================
@@ -347,7 +576,6 @@ document.getElementById("regionFilter").addEventListener("change", () => {
 })
 
 document.getElementById("rtomSelect").addEventListener("change", () => {
-  console.log("[v0] RTOM changed to:", document.getElementById("rtomSelect").value)
   updateMarkers()
   updateUtilityTable()
 })
@@ -356,118 +584,3 @@ document.getElementById("colorMode").addEventListener("change", () => {
   updateMarkers()
   updateUtilityTable()
 })
-
-function updateUtilityTable() {
-  const region = document.getElementById("regionFilter").value
-  const rtom = document.getElementById("rtomSelect").value
-  const metric = document.getElementById("colorMode").value
-  const tbody = document.getElementById("utilityTableBody")
-  const table = document.getElementById("utilityTable")
-  const titleDiv = document.querySelector(".utility-table-title")
-
-  const params = new URLSearchParams()
-  params.append("region", region)
-  params.append("rtom", rtom)
-  params.append("metric", metric)
-
-  fetch(`/get_utility_stats?${params}`)
-    .then((r) => r.json())
-    .then((payload) => {
-      if (!payload.success) {
-        console.error("Failed to load utility stats")
-        return
-      }
-
-      const stats = payload.stats
-      const regions = payload.regions
-      const isRtom = payload.is_rtom
-      const rtomBreakdown = payload.rtom_breakdown
-
-      console.log("[v0] Utility stats received - isRtom:", isRtom, "stats:", stats)
-
-      tbody.innerHTML = ""
-
-      const headerRow = table.querySelector("thead tr")
-      while (headerRow.children.length > 1) {
-        headerRow.removeChild(headerRow.lastChild)
-      }
-
-      let titleText = "Site Utility Distribution"
-      const metricLabel = metric === "traffic" ? "(Traffic)" : "(User Count)"
-
-      if (rtom !== "All") {
-        titleText = `Site Utility Distribution - ${rtom} ${metricLabel}`
-      } else if (region !== "All") {
-        titleText = `Site Utility Distribution - ${region} ${metricLabel}`
-      }
-      titleDiv.textContent = titleText
-
-      let displayRegions = regions
-      if (rtomBreakdown && Object.keys(rtomBreakdown).length > 0) {
-        displayRegions = [region, ...Object.keys(rtomBreakdown)]
-      }
-
-      displayRegions.forEach((r) => {
-        const th = document.createElement("th")
-        th.textContent = r
-        headerRow.appendChild(th)
-      })
-
-      const levels = [
-        { key: "high", label: "High Utility", class: "high" },
-        { key: "avg", label: "Average Utility", class: "avg" },
-        { key: "low", label: "Low Utility", class: "low" },
-      ]
-
-      levels.forEach((level) => {
-        const row = document.createElement("tr")
-        const labelCell = document.createElement("td")
-        labelCell.textContent = level.label
-        labelCell.style.fontWeight = "500"
-        row.appendChild(labelCell)
-
-        displayRegions.forEach((r) => {
-          const cell = document.createElement("td")
-          let value = "-"
-
-          if (stats[r]) {
-            value = stats[r][level.key] + "%"
-          } else if (rtomBreakdown && rtomBreakdown[r]) {
-            value = rtomBreakdown[r][level.key] + "%"
-          }
-
-          cell.textContent = value
-          cell.className = level.class
-          row.appendChild(cell)
-        })
-
-        tbody.appendChild(row)
-      })
-
-      if (rtom === "All" && region === "All") {
-        const totalRow = document.createElement("tr")
-        const totalLabelCell = document.createElement("td")
-        totalLabelCell.textContent = "Total"
-        totalLabelCell.style.fontWeight = "600"
-        totalRow.appendChild(totalLabelCell)
-
-        regions.forEach((r) => {
-          const cell = document.createElement("td")
-          const regionStats = stats[r]
-          if (regionStats) {
-            const total = regionStats.high + regionStats.avg + regionStats.low
-            cell.textContent = total.toFixed(1) + "%"
-          } else {
-            cell.textContent = "-"
-          }
-          cell.className = "total"
-          totalRow.appendChild(cell)
-        })
-
-        tbody.appendChild(totalRow)
-      }
-    })
-    .catch((err) => {
-      console.error("Error loading utility stats:", err)
-    })
-}
