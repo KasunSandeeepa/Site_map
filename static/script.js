@@ -15,6 +15,10 @@ function loadAdminInfo() {
       const role = payload.role
       const region = payload.region
 
+      // Store admin info globally
+      currentAdminRole = role
+      currentAdminRegion = region
+
       const adminUsernameEl = document.getElementById("adminUsername")
       const adminRoleEl = document.getElementById("adminRole")
 
@@ -26,6 +30,7 @@ function loadAdminInfo() {
       if (role === "region_admin" && region) {
         regionFilter.value = region
         regionFilter.disabled = true
+        // Trigger update to show only the admin's region
         updateRtomFilter()
         updateMarkers()
         updateUtilityTable()
@@ -69,11 +74,58 @@ let utilityStats = {}
 let trafficChart = null
 let userChart = null
 let currentSiteId = null
+let currentAdminRole = null
+let currentAdminRegion = null
 
 // ============================
 // Data Loading
 // ============================
-fetch("/get_sites")
+let dataLoadPromises = {
+  sites: null,
+  cities: null,
+  stats: null,
+  adminInfo: null
+}
+
+// Load admin info first
+dataLoadPromises.adminInfo = fetch("/get_admin_info")
+  .then((r) => r.json())
+  .then((payload) => {
+    console.log("[v0] Admin info loaded:", payload)
+    if (!payload.success) {
+      window.location.href = "/login"
+      throw new Error("Not authenticated")
+    }
+
+    const username = payload.username
+    const role = payload.role
+    const region = payload.region
+
+    // Store admin info globally
+    currentAdminRole = role
+    currentAdminRegion = region
+
+    const adminUsernameEl = document.getElementById("adminUsername")
+    const adminRoleEl = document.getElementById("adminRole")
+
+    const roleDisplay = role === "super_admin" ? "Super Admin" : `${region} Admin`
+    adminUsernameEl.textContent = `User: ${username}`
+    adminRoleEl.textContent = roleDisplay
+
+    const regionFilter = document.getElementById("regionFilter")
+    if (role === "region_admin" && region) {
+      regionFilter.value = region
+      regionFilter.disabled = true
+    }
+    
+    return payload
+  })
+  .catch((err) => {
+    console.error("Error loading admin info:", err)
+    window.location.href = "/login"
+  })
+
+dataLoadPromises.sites = fetch("/get_sites")
   .then((r) => r.json())
   .then((payload) => {
     if (!payload.success) {
@@ -82,30 +134,44 @@ fetch("/get_sites")
     }
     allSites = payload.sites || []
     console.log("[v0] Loaded", allSites.length, "sites")
-    updateMarkers()
   })
   .catch((err) => {
     console.error("[v0] Fetch error:", err)
     alert("Error loading data: " + err.message)
   })
 
-fetch("/get_cities")
+dataLoadPromises.cities = fetch("/get_cities")
   .then((r) => r.json())
   .then((payload) => {
     if (!payload.success) return
     allCities = payload.cities || []
-    populateRtomFilter()
+    console.log("[v0] Loaded", allCities.length, "cities")
   })
   .catch((err) => console.error("[v0] Cities error:", err))
 
-fetch("/get_utility_stats")
+dataLoadPromises.stats = fetch("/get_utility_stats")
   .then((r) => r.json())
   .then((payload) => {
     if (!payload.success) return
     utilityStats = payload
-    updateUtilityTable()
   })
   .catch((err) => console.error("[v0] Stats error:", err))
+
+// Wait for all data to load, then initialize
+Promise.all([
+  dataLoadPromises.adminInfo,
+  dataLoadPromises.sites,
+  dataLoadPromises.cities,
+  dataLoadPromises.stats
+]).then(() => {
+  console.log("[v0] All data loaded, initializing UI")
+  populateRtomFilter()
+  updateRtomFilter()
+  updateMarkers()
+  updateUtilityTable()
+}).catch(err => {
+  console.error("[v0] Error during initialization:", err)
+})
 
 // ============================
 // Helper Functions
@@ -113,7 +179,20 @@ fetch("/get_utility_stats")
 function populateRtomFilter() {
   const rtomSelect = document.getElementById("rtomSelect")
   rtomSelect.innerHTML = '<option value="All">All RTOMs</option>'
-  allCities.forEach((city) => {
+  
+  // Filter cities based on admin role
+  let citiesToShow = allCities
+  
+  if (currentAdminRole === 'region_admin' && currentAdminRegion) {
+    // For region admin, only show RTOMs from their region
+    citiesToShow = allSites
+      .filter(site => (site.Sales_Region || "").trim() === currentAdminRegion)
+      .map(site => site.RTOM)
+      .filter((rtom, index, self) => rtom && self.indexOf(rtom) === index)
+      .sort()
+  }
+  
+  citiesToShow.forEach((city) => {
     const option = document.createElement("option")
     option.value = city
     option.textContent = city
@@ -132,6 +211,8 @@ function updateRtomFilter() {
   }
 
   rtomSelect.style.display = "block"
+  
+  // Get RTOMs for the selected region
   const regionRtoms = allSites
     .filter((site) => (site.Sales_Region || "").trim() === region)
     .map((site) => site.RTOM)
@@ -145,6 +226,11 @@ function updateRtomFilter() {
     option.textContent = rtom
     rtomSelect.appendChild(option)
   })
+  
+  // For region admins, automatically show their RTOM dropdown
+  if (currentAdminRole === 'region_admin' && currentAdminRegion === region) {
+    rtomSelect.style.display = "block"
+  }
 }
 
 function toFixedSafe(x, d = 2) {
