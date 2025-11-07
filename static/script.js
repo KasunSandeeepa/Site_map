@@ -5,7 +5,7 @@ function loadAdminInfo() {
   fetch("/get_admin_info")
     .then((r) => r.json())
     .then((payload) => {
-      console.log("[v0] Admin info response:", payload)
+      console.log("[..] Admin info response:", payload)
       if (!payload.success) {
         window.location.href = "/login"
         return
@@ -91,7 +91,7 @@ let dataLoadPromises = {
 dataLoadPromises.adminInfo = fetch("/get_admin_info")
   .then((r) => r.json())
   .then((payload) => {
-    console.log("[v0] Admin info loaded:", payload)
+    console.log("[..] Admin info loaded:", payload)
     if (!payload.success) {
       window.location.href = "/login"
       throw new Error("Not authenticated")
@@ -133,10 +133,10 @@ dataLoadPromises.sites = fetch("/get_sites")
       return
     }
     allSites = payload.sites || []
-    console.log("[v0] Loaded", allSites.length, "sites")
+    console.log("[..] Loaded", allSites.length, "sites")
   })
   .catch((err) => {
-    console.error("[v0] Fetch error:", err)
+    console.error("[..] Fetch error:", err)
     alert("Error loading data: " + err.message)
   })
 
@@ -145,9 +145,9 @@ dataLoadPromises.cities = fetch("/get_cities")
   .then((payload) => {
     if (!payload.success) return
     allCities = payload.cities || []
-    console.log("[v0] Loaded", allCities.length, "cities")
+    console.log("[..] Loaded", allCities.length, "cities")
   })
-  .catch((err) => console.error("[v0] Cities error:", err))
+  .catch((err) => console.error("[..] Cities error:", err))
 
 dataLoadPromises.stats = fetch("/get_utility_stats")
   .then((r) => r.json())
@@ -155,7 +155,7 @@ dataLoadPromises.stats = fetch("/get_utility_stats")
     if (!payload.success) return
     utilityStats = payload
   })
-  .catch((err) => console.error("[v0] Stats error:", err))
+  .catch((err) => console.error("[..] Stats error:", err))
 
 // Wait for all data to load, then initialize
 Promise.all([
@@ -164,13 +164,13 @@ Promise.all([
   dataLoadPromises.cities,
   dataLoadPromises.stats
 ]).then(() => {
-  console.log("[v0] All data loaded, initializing UI")
+  console.log("[..] All data loaded, initializing UI")
   populateRtomFilter()
   updateRtomFilter()
   updateMarkers()
   updateUtilityTable()
 }).catch(err => {
-  console.error("[v0] Error during initialization:", err)
+  console.error("[..] Error during initialization:", err)
 })
 
 // ============================
@@ -312,12 +312,12 @@ async function loadAndDisplayTrends(site) {
     
     // Prevent reloading same site
     if (currentSiteId === normalizedId && trafficChart && userChart) {
-      console.log("[v0] Same site, skipping reload")
+      console.log("[..] Same site, skipping reload")
       return
     }
     
     currentSiteId = normalizedId
-    console.log("[v0] Loading trends for:", normalizedId, site.eNodeB_Name)
+    console.log("[..] Loading trends for:", normalizedId, site.eNodeB_Name)
 
     // Destroy existing charts
     destroyCharts()
@@ -335,7 +335,7 @@ async function loadAndDisplayTrends(site) {
     const response = await fetch(`/get_site_trends/${normalizedId}`)
     const data = await response.json()
 
-    console.log("[v0] Response:", {
+    console.log("[..] Response:", {
       success: data.success,
       traffic: data.traffic_trend?.length || 0,
       users: data.user_trend?.length || 0
@@ -428,7 +428,7 @@ async function loadAndDisplayTrends(site) {
             },
           },
         })
-        console.log("[v0] Traffic chart created")
+        console.log("[..] Traffic chart created")
       }
     }
 
@@ -476,12 +476,12 @@ async function loadAndDisplayTrends(site) {
             },
           },
         })
-        console.log("[v0] User chart created")
+        console.log("[..] User chart created")
       }
     }
 
   } catch (err) {
-    console.error("[v0] Error:", err)
+    console.error("[..] Error:", err)
     const trendsContainer = document.getElementById("trendsContainer")
     if (trendsContainer) {
       trendsContainer.innerHTML = `<p style="text-align: center; color: #ef4444; padding: 20px; font-size: 13px;">Error: ${err.message}</p>`
@@ -577,7 +577,7 @@ function updateMarkers() {
 
     // Load trends in sidebar when marker is clicked
     marker.on("click", () => {
-      console.log("[v0] Marker clicked:", site.eNodeB_Name)
+      console.log("[..] Marker clicked:", site.eNodeB_Name)
       loadAndDisplayTrends(site)
     })
 
@@ -585,7 +585,7 @@ function updateMarkers() {
     markers.push(marker)
   })
 
-  console.log("[v0] Displayed", markers.length, "markers")
+  console.log("[..] Displayed", markers.length, "markers")
 
   if (markers.length > 0) {
     const group = L.featureGroup(markers)

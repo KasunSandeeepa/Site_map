@@ -68,9 +68,9 @@ def load_trend_data():
         # Load Traffic Data
         traffic_df = pd.read_excel(EXCEL_FILE, sheet_name=TREND_TRAFFIC_SHEET, engine='openpyxl')
         traffic_df = canonicalize_columns(traffic_df)
-        print("[v0] ===== TRAFFIC SHEET DEBUG =====")
-        print("[v0] All columns:", list(traffic_df.columns))
-        print("[v0] First few rows:")
+        print("[..] ===== TRAFFIC SHEET DEBUG =====")
+        print("[..] All columns:", list(traffic_df.columns))
+        print("[..] First few rows:")
         print(traffic_df.head())
         
         # Find month columns - be more flexible with matching
@@ -84,7 +84,7 @@ def load_trend_data():
                         if traffic_df[col].dtype in ['int64', 'float64'] or 
                         pd.to_numeric(traffic_df[col], errors='coerce').notna().any()]
         
-        print(f"[v0] Found {len(month_columns)} month columns: {month_columns[:5]}...")
+        print(f"[..] Found {len(month_columns)} month columns: {month_columns[:5]}...")
         
         for idx, row in traffic_df.iterrows():
             node_id = row.get('eNodeB ID')
@@ -111,17 +111,17 @@ def load_trend_data():
                         pass
         
         traffic_with_data = sum(1 for n in trend_data if len(trend_data[n]['traffic']) > 0)
-        print(f"[v0] Traffic: {traffic_with_data} nodes with data")
+        print(f"[..] Traffic: {traffic_with_data} nodes with data")
         if traffic_with_data > 0:
             sample_id = next(n for n in trend_data if len(trend_data[n]['traffic']) > 0)
-            print(f"[v0] Sample traffic data for ID {sample_id}: {trend_data[sample_id]['traffic']}")
+            print(f"[..] Sample traffic data for ID {sample_id}: {trend_data[sample_id]['traffic']}")
         
         # Load User Data
         user_df = pd.read_excel(EXCEL_FILE, sheet_name=TREND_USER_SHEET, engine='openpyxl')
         user_df = canonicalize_columns(user_df)
-        print("[v0] ===== USER SHEET DEBUG =====")
-        print("[v0] All columns:", list(user_df.columns))
-        print("[v0] First few rows:")
+        print("[..] ===== USER SHEET DEBUG =====")
+        print("[..] All columns:", list(user_df.columns))
+        print("[..] First few rows:")
         print(user_df.head())
         
         # Find week columns - be more flexible
@@ -135,7 +135,7 @@ def load_trend_data():
                        if user_df[col].dtype in ['int64', 'float64'] or 
                        pd.to_numeric(user_df[col], errors='coerce').notna().any()]
         
-        print(f"[v0] Found {len(week_columns)} week columns: {week_columns[:5]}...")
+        print(f"[..] Found {len(week_columns)} week columns: {week_columns[:5]}...")
         
         for idx, row in user_df.iterrows():
             node_id = row.get('eNodeB ID')
@@ -162,15 +162,15 @@ def load_trend_data():
                         pass
         
         users_with_data = sum(1 for n in trend_data if len(trend_data[n]['users']) > 0)
-        print(f"[v0] User: {users_with_data} nodes with data")
+        print(f"[..] User: {users_with_data} nodes with data")
         if users_with_data > 0:
             sample_id = next(n for n in trend_data if len(trend_data[n]['users']) > 0)
-            print(f"[v0] Sample user data for ID {sample_id}: {trend_data[sample_id]['users']}")
+            print(f"[..] Sample user data for ID {sample_id}: {trend_data[sample_id]['users']}")
         
-        print(f"[v0] ===== FINAL: {len(trend_data)} total nodes in cache =====")
+        print(f"[..] ===== FINAL: {len(trend_data)} total nodes in cache =====")
         
     except Exception as e:
-        print(f"[v0] ERROR in load_trend_data: {e}")
+        print(f"[..] ERROR in load_trend_data: {e}")
         import traceback
         traceback.print_exc()
     
@@ -361,12 +361,12 @@ def get_site_trends(site_id):
         except (ValueError, TypeError):
             site_id_lookup = str(site_id).strip()
         
-        print(f"[v0] Trend lookup for site_id={site_id}, normalized={site_id_lookup}")
-        print(f"[v0] Available keys sample: {list(trend_data_cache.keys())[:10]}")
+        print(f"[..] Trend lookup for site_id={site_id}, normalized={site_id_lookup}")
+        print(f"[..] Available keys sample: {list(trend_data_cache.keys())[:10]}")
         
         # Check if ID exists in cache
         if site_id_lookup not in trend_data_cache:
-            print(f"[v0] ID {site_id_lookup} not found in cache")
+            print(f"[..] ID {site_id_lookup} not found in cache")
             return jsonify({
                 'success': False,
                 'error': f'No trend data available for site {site_id}'
@@ -374,7 +374,7 @@ def get_site_trends(site_id):
         
         trend_info = trend_data_cache.get(site_id_lookup, {'traffic': {}, 'users': {}})
         
-        print(f"[v0] Found traffic points: {len(trend_info['traffic'])}, user points: {len(trend_info['users'])}")
+        print(f"[..] Found traffic points: {len(trend_info['traffic'])}, user points: {len(trend_info['users'])}")
         
         traffic_trend = [
             {'period': period, 'value': value} 
@@ -391,7 +391,7 @@ def get_site_trends(site_id):
             'user_trend': user_trend
         })
     except Exception as e:
-        print(f"[v0] ERROR in get_site_trends: {e}")
+        print(f"[..] ERROR in get_site_trends: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
