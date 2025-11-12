@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>SLT Mobitel Network Monitoring – Sri Lanka</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>SLT Mobitel Network Monitoring</title>
 
 <link
   rel="stylesheet"
@@ -34,47 +34,52 @@
     align-items: center;
     background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
     border-bottom: 1px solid #1e293b;
-    padding: 16px 24px;
-    height: 70px;
+    padding: 12px 16px;
+    min-height: 60px;
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
   .header-title {
-    font-size: 24px;
+    font-size: 18px;
     font-weight: 700;
     background: linear-gradient(135deg, #60a5fa, #3b82f6);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    white-space: nowrap;
   }
 
   .controls {
     display: flex;
-    gap: 16px;
+    gap: 8px;
     align-items: center;
+    flex-wrap: wrap;
   }
 
   .control-group {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     align-items: center;
   }
 
   .control-group label {
-    font-size: 13px;
+    font-size: 11px;
     font-weight: 600;
     color: #94a3b8;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    white-space: nowrap;
   }
 
   .control-group select {
-    padding: 8px 12px;
+    padding: 6px 10px;
     background: #1e293b;
     color: #e2e8f0;
     border: 1px solid #334155;
     border-radius: 6px;
-    font-size: 13px;
+    font-size: 12px;
     cursor: pointer;
     transition: all 0.2s;
   }
@@ -86,52 +91,74 @@
 
   .admin-section {
     display: flex;
-    gap: 12px;
+    gap: 8px;
     align-items: center;
-    border-left: 1px solid #334155;
-    padding-left: 16px;
+    padding-left: 8px;
   }
 
   .admin-info {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     align-items: center;
-    font-size: 13px;
+    font-size: 11px;
   }
 
   .admin-badge {
     background: linear-gradient(135deg, #3b82f6, #1e40af);
     color: white;
-    padding: 4px 10px;
+    padding: 3px 8px;
     border-radius: 4px;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    white-space: nowrap;
   }
 
   .logout-btn {
-    padding: 8px 16px;
+    padding: 6px 12px;
     background: #ef4444;
     color: white;
     border: none;
     border-radius: 6px;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
+    white-space: nowrap;
   }
 
   .logout-btn:hover {
     background: #dc2626;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+  }
+
+  /* Mobile Menu Toggle */
+  .mobile-toggle {
+    display: none;
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+    background: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 56px;
+    height: 56px;
+    font-size: 24px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.5);
+    transition: all 0.3s;
+  }
+
+  .mobile-toggle:active {
+    transform: scale(0.95);
   }
 
   /* Layout Container */
   .container {
     display: flex;
-    height: calc(100vh - 70px);
+    height: calc(100vh - 60px);
   }
 
   /* Map Area */
@@ -151,6 +178,7 @@
     z-index: 500;
     overflow-y: auto;
     box-shadow: -4px 0 16px rgba(0, 0, 0, 0.4);
+    transition: transform 0.3s ease;
   }
 
   .sidebar-section {
@@ -159,7 +187,7 @@
   }
 
   .sidebar-title {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 700;
     color: #e2e8f0;
     text-transform: uppercase;
@@ -171,7 +199,7 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    font-size: 13px;
+    font-size: 12px;
     color: #cbd5e1;
     margin-bottom: 8px;
   }
@@ -227,7 +255,7 @@
   }
 
   #trendsSiteTitle {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     color: #60a5fa;
     margin-bottom: 12px;
@@ -243,12 +271,13 @@
     border: 1px solid #334155;
     border-radius: 8px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    padding: 16px;
+    padding: 12px;
     color: #e2e8f0;
   }
 
   .leaflet-popup-content {
     margin: 0 !important;
+    font-size: 12px;
   }
 
   .leaflet-popup-tip {
@@ -259,6 +288,7 @@
   .leaflet-control-attribution {
     background: rgba(15, 23, 42, 0.8) !important;
     color: #94a3b8 !important;
+    font-size: 10px !important;
   }
 
   .leaflet-control-attribution a {
@@ -281,6 +311,183 @@
 
   .sidebar::-webkit-scrollbar-thumb:hover {
     background: #475569;
+  }
+
+  /* ============================= */
+  /* MOBILE RESPONSIVE STYLES */
+  /* ============================= */
+  @media (max-width: 768px) {
+    .header {
+      padding: 8px 12px;
+      min-height: auto;
+    }
+
+    .header-title {
+      font-size: 16px;
+      width: 100%;
+      margin-bottom: 8px;
+    }
+
+    .controls {
+      width: 100%;
+      justify-content: space-between;
+    }
+
+    .control-group {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .control-group label {
+      display: none;
+    }
+
+    .control-group select {
+      width: 100%;
+      font-size: 11px;
+      padding: 6px 8px;
+    }
+
+    .admin-section {
+      width: 100%;
+      border-left: none;
+      border-top: 1px solid #334155;
+      padding: 8px 0 0 0;
+      margin-top: 8px;
+      justify-content: space-between;
+    }
+
+    .admin-info {
+      font-size: 10px;
+    }
+
+    .admin-badge {
+      font-size: 9px;
+      padding: 2px 6px;
+    }
+
+    .logout-btn {
+      padding: 6px 10px;
+      font-size: 11px;
+    }
+
+    /* Container */
+    .container {
+      height: calc(100vh - 140px);
+      flex-direction: column;
+    }
+
+    #map {
+      height: 60%;
+      min-height: 300px;
+    }
+
+    /* Sidebar becomes bottom panel */
+    .sidebar {
+      width: 100%;
+      height: 40%;
+      min-height: 200px;
+      border-left: none;
+      border-top: 2px solid #1e293b;
+      box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.4);
+      position: relative;
+    }
+
+    .sidebar.hidden {
+      transform: translateY(100%);
+    }
+
+    .mobile-toggle {
+      display: block;
+    }
+
+    .sidebar-section {
+      padding: 12px;
+    }
+
+    .sidebar-title {
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    .legend-item {
+      font-size: 11px;
+      margin-bottom: 6px;
+    }
+
+    .utility-table {
+      font-size: 11px;
+    }
+
+    .utility-table th,
+    .utility-table td {
+      padding: 6px;
+    }
+
+    #trendsSiteTitle {
+      font-size: 11px;
+      padding: 6px;
+    }
+
+    /* Popup adjustments for mobile */
+    .leaflet-popup-content-wrapper {
+      padding: 10px;
+      max-width: calc(100vw - 40px) !important;
+    }
+
+    .leaflet-popup-content {
+      font-size: 11px;
+    }
+
+    /* Make tables scrollable on mobile */
+    .sidebar-section table {
+      display: block;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .header-title {
+      font-size: 14px;
+    }
+
+    .control-group select {
+      font-size: 10px;
+      padding: 5px 6px;
+    }
+
+    .sidebar {
+      height: 50%;
+    }
+
+    #map {
+      height: 50%;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+    }
+  }
+
+  /* Landscape mobile */
+  @media (max-width: 768px) and (orientation: landscape) {
+    .container {
+      flex-direction: row;
+    }
+
+    #map {
+      width: 60%;
+      height: 100%;
+    }
+
+    .sidebar {
+      width: 40%;
+      height: 100%;
+      border-left: 2px solid #1e293b;
+      border-top: none;
+    }
   }
 </style>
 </head>
@@ -307,34 +514,34 @@
     </div>
 
     <div class="control-group">
-      <label for="colorMode">Color By</label>
+      <label for="colorMode">Color</label>
       <select id="colorMode">
-        <option value="traffic">Traffic (TB)</option>
-        <option value="users">User Count</option>
+        <option value="traffic">Traffic</option>
+        <option value="users">Users</option>
       </select>
     </div>
+  </div>
 
-    <div class="admin-section">
-      <div class="admin-info">
-        <span id="adminUsername">Loading...</span>
-        <span class="admin-badge" id="adminRole">—</span>
-      </div>
-      <button class="logout-btn" onclick="logout()">Logout</button>
+  <div class="admin-section">
+    <div class="admin-info">
+      <span id="adminUsername">Loading...</span>
+      <span class="admin-badge" id="adminRole">—</span>
     </div>
+    <button class="logout-btn" onclick="logout()">Logout</button>
   </div>
 </div>
 
 <div class="container">
   <div id="map"></div>
   
-  <div class="sidebar">
+  <div class="sidebar" id="sidebar">
     <div class="sidebar-section">
       <div class="sidebar-title">Legend</div>
       <div id="legend-content"></div>
     </div>
 
     <div class="sidebar-section">
-      <div class="sidebar-title">Site Utility Distribution</div>
+      <div class="sidebar-title">Site Distribution</div>
       <table id="utilityTable" class="utility-table">
         <thead>
           <tr>
@@ -351,13 +558,21 @@
       <div class="sidebar-title">Site Trends</div>
       <div id="trendsSiteTitle">Select a site</div>
       <div id="trendsContainer">
-        <p style="text-align: center; color: #999; padding: 20px; font-size: 13px;">Click on a site marker to view trends</p>
+        <p style="text-align: center; color: #999; padding: 16px; font-size: 12px;">Click on a site to view trends</p>
       </div>
     </div>
   </div>
 </div>
 
+<button class="mobile-toggle" id="mobileToggle" onclick="toggleSidebar()">☰</button>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+  function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    sidebar.classList.toggle('hidden');
+  }
+</script>
 <script src="/static/script.js"></script>
 </body>
 </html>
