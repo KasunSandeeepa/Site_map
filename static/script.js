@@ -5,7 +5,7 @@ function loadAdminInfo() {
   fetch("/get_admin_info")
     .then((r) => r.json())
     .then((payload) => {
-      console.log("[..] Admin info response:", payload)
+      console.log("[v0] Admin info response:", payload)
       if (!payload.success) {
         window.location.href = "/login"
         return
@@ -59,7 +59,8 @@ const sriLankaBounds = [
 const L = window.L
 const map = L.map("map", {
   maxBounds: sriLankaBounds,
-  maxBoundsViscosity: 0.9,
+  maxBoundsViscosity: 0.5, // Reduced viscosity to allow popup to show near edges
+  maxBoundsViscosity: 1.0,
 }).setView([7.8731, 80.7718], 8)
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -91,7 +92,7 @@ let dataLoadPromises = {
 dataLoadPromises.adminInfo = fetch("/get_admin_info")
   .then((r) => r.json())
   .then((payload) => {
-    console.log("[..] Admin info loaded:", payload)
+    console.log("[v0] Admin info loaded:", payload)
     if (!payload.success) {
       window.location.href = "/login"
       throw new Error("Not authenticated")
@@ -133,10 +134,10 @@ dataLoadPromises.sites = fetch("/get_sites")
       return
     }
     allSites = payload.sites || []
-    console.log("[..] Loaded", allSites.length, "sites")
+    console.log("[v0] Loaded", allSites.length, "sites")
   })
   .catch((err) => {
-    console.error("[..] Fetch error:", err)
+    console.error("[v0] Fetch error:", err)
     alert("Error loading data: " + err.message)
   })
 
@@ -145,9 +146,9 @@ dataLoadPromises.cities = fetch("/get_cities")
   .then((payload) => {
     if (!payload.success) return
     allCities = payload.cities || []
-    console.log("[..] Loaded", allCities.length, "cities")
+    console.log("[v0] Loaded", allCities.length, "cities")
   })
-  .catch((err) => console.error("[..] Cities error:", err))
+  .catch((err) => console.error("[v0] Cities error:", err))
 
 dataLoadPromises.stats = fetch("/get_utility_stats")
   .then((r) => r.json())
@@ -155,7 +156,7 @@ dataLoadPromises.stats = fetch("/get_utility_stats")
     if (!payload.success) return
     utilityStats = payload
   })
-  .catch((err) => console.error("[..] Stats error:", err))
+  .catch((err) => console.error("[v0] Stats error:", err))
 
 // Wait for all data to load, then initialize
 Promise.all([
@@ -164,13 +165,13 @@ Promise.all([
   dataLoadPromises.cities,
   dataLoadPromises.stats
 ]).then(() => {
-  console.log("[..] All data loaded, initializing UI")
+  console.log("[v0] All data loaded, initializing UI")
   populateRtomFilter()
   updateRtomFilter()
   updateMarkers()
   updateUtilityTable()
 }).catch(err => {
-  console.error("[..] Error during initialization:", err)
+  console.error("[v0] Error during initialization:", err)
 })
 
 // ============================
@@ -180,16 +181,27 @@ function populateRtomFilter() {
   const rtomSelect = document.getElementById("rtomSelect")
   rtomSelect.innerHTML = '<option value="All">All RTOMs</option>'
   
-  // Filter cities based on admin role
-  let citiesToShow = allCities
+  console.log("[v0] populateRtomFilter - Role:", currentAdminRole, "Region:", currentAdminRegion)
+  
+  let citiesToShow = []
   
   if (currentAdminRole === 'region_admin' && currentAdminRegion) {
     // For region admin, only show RTOMs from their region
+    console.log("[v0] Filtering RTOMs for region admin:", currentAdminRegion)
     citiesToShow = allSites
-      .filter(site => (site.Sales_Region || "").trim() === currentAdminRegion)
+      .filter(site => {
+        const siteRegion = (site.Sales_Region || "").trim()
+        return siteRegion === currentAdminRegion
+      })
       .map(site => site.RTOM)
       .filter((rtom, index, self) => rtom && self.indexOf(rtom) === index)
       .sort()
+    
+    console.log("[v0] RTOMs for", currentAdminRegion, ":", citiesToShow)
+  } else {
+    // For super admin, show all RTOMs
+    console.log("[v0] Super admin - showing all RTOMs")
+    citiesToShow = allCities
   }
   
   citiesToShow.forEach((city) => {
@@ -198,6 +210,8 @@ function populateRtomFilter() {
     option.textContent = city
     rtomSelect.appendChild(option)
   })
+  
+  console.log("[v0] Populated", citiesToShow.length, "RTOMs in dropdown")
 }
 
 function updateRtomFilter() {
@@ -306,18 +320,30 @@ function destroyCharts() {
 // ============================
 // Trend Loading (In Sidebar)
 // ============================
+function formatMonthLabel(label) {
+  // Convert "Jul-24" to "Jul" or "Jun-25" to "Jun"
+  // Handle various formats
+  if (!label) return label
+  
+  const parts = String(label).split('-')
+  if (parts.length >= 1) {
+    return parts[0] // Return just the month part
+  }
+  return label
+}
+
 async function loadAndDisplayTrends(site) {
   try {
     const normalizedId = String(site.eNodeB_ID).trim()
     
     // Prevent reloading same site
     if (currentSiteId === normalizedId && trafficChart && userChart) {
-      console.log("[..] Same site, skipping reload")
+      console.log("[v0] Same site, skipping reload")
       return
     }
     
     currentSiteId = normalizedId
-    console.log("[..] Loading trends for:", normalizedId, site.eNodeB_Name)
+    console.log("[v0] Loading trends for:", normalizedId, site.eNodeB_Name)
 
     // Destroy existing charts
     destroyCharts()
@@ -335,7 +361,7 @@ async function loadAndDisplayTrends(site) {
     const response = await fetch(`/get_site_trends/${normalizedId}`)
     const data = await response.json()
 
-    console.log("[..] Response:", {
+    console.log("[v0] Response:", {
       success: data.success,
       traffic: data.traffic_trend?.length || 0,
       users: data.user_trend?.length || 0
@@ -391,7 +417,7 @@ async function loadAndDisplayTrends(site) {
         trafficChart = new window.Chart(ctx, {
           type: "line",
           data: {
-            labels: data.traffic_trend.map(d => d.period),
+            labels: data.traffic_trend.map(d => formatMonthLabel(d.period)),
             datasets: [{
               label: "Traffic (GB)",
               data: data.traffic_trend.map(d => d.value),
@@ -421,14 +447,14 @@ async function loadAndDisplayTrends(site) {
                 ticks: { 
                   color: "#94a3b8", 
                   font: { size: 9 }, 
-                  maxRotation: 45,
-                  minRotation: 45
+                  maxRotation: 0,
+                  minRotation: 0
                 },
               },
             },
           },
         })
-        console.log("[..] Traffic chart created")
+        console.log("[v0] Traffic chart created")
       }
     }
 
@@ -439,7 +465,7 @@ async function loadAndDisplayTrends(site) {
         userChart = new window.Chart(ctx, {
           type: "line",
           data: {
-            labels: data.user_trend.map(d => d.period),
+            labels: data.user_trend.map(d => formatMonthLabel(d.period)),
             datasets: [{
               label: "User Count",
               data: data.user_trend.map(d => d.value),
@@ -469,19 +495,19 @@ async function loadAndDisplayTrends(site) {
                 ticks: { 
                   color: "#94a3b8", 
                   font: { size: 9 }, 
-                  maxRotation: 45,
-                  minRotation: 45
+                  maxRotation: 0,
+                  minRotation: 0
                 },
               },
             },
           },
         })
-        console.log("[..] User chart created")
+        console.log("[v0] User chart created")
       }
     }
 
   } catch (err) {
-    console.error("[..] Error:", err)
+    console.error("[v0] Error:", err)
     const trendsContainer = document.getElementById("trendsContainer")
     if (trendsContainer) {
       trendsContainer.innerHTML = `<p style="text-align: center; color: #ef4444; padding: 20px; font-size: 13px;">Error: ${err.message}</p>`
@@ -519,9 +545,9 @@ function updateMarkers() {
       fillOpacity: 0.9,
     })
 
-    // Smaller popup - no trends
+    // Smaller popup - no trends, removed DL/UL/Avg DL
     const popupHtml = `
-      <div style="width: 400px; max-width: 90vw;">
+      <div style="width: 350px; max-width: 90vw;">
         <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #334155;">
           <h4 style="font-size: 15px; font-weight: 700; color: #60a5fa; margin-bottom: 8px;">${escapeHtml(site.eNodeB_Name || "")}</h4>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; color: #cbd5e1;">
@@ -540,28 +566,16 @@ function updateMarkers() {
           </thead>
           <tbody>
             <tr>
-              <td style="padding: 6px; border-bottom: 1px solid #334155; color: #cbd5e1;">DL (GB)</td>
-              <td style="padding: 6px; border-bottom: 1px solid #334155; color: #cbd5e1; text-align: right;">${formatNum(site.Monthly_Traffic_DL_GB)}</td>
-            </tr>
-            <tr>
-              <td style="padding: 6px; border-bottom: 1px solid #334155; color: #cbd5e1;">UL (GB)</td>
-              <td style="padding: 6px; border-bottom: 1px solid #334155; color: #cbd5e1; text-align: right;">${formatNum(site.Monthly_Traffic_UL_GB)}</td>
-            </tr>
-            <tr>
-              <td style="padding: 6px; border-bottom: 1px solid #334155; color: #cbd5e1;">Total (GB)</td>
-              <td style="padding: 6px; border-bottom: 1px solid #334155; color: #cbd5e1; text-align: right;">${formatNum(site.Monthly_Traffic_Total_GB)}</td>
+              <td style="padding: 6px; border-bottom: 1px solid #334155; color: #cbd5e1;">Total Traffic</td>
+              <td style="padding: 6px; border-bottom: 1px solid #334155; color: #cbd5e1; text-align: right;">${formatNum(site.Monthly_Traffic_Total_GB)} GB</td>
             </tr>
             <tr>
               <td style="padding: 6px; border-bottom: 1px solid #334155; color: #cbd5e1;">Bandwidth</td>
               <td style="padding: 6px; border-bottom: 1px solid #334155; color: #cbd5e1; text-align: right;">${escapeHtml(String(site.Bandwidth || "-"))}</td>
             </tr>
             <tr>
-              <td style="padding: 6px; border-bottom: 1px solid #334155; color: #cbd5e1;">User Count</td>
-              <td style="padding: 6px; border-bottom: 1px solid #334155; color: #cbd5e1; text-align: right;">${site.User_Count || "-"}</td>
-            </tr>
-            <tr>
-              <td style="padding: 6px; color: #cbd5e1;">Avg DL (Mbps)</td>
-              <td style="padding: 6px; color: #cbd5e1; text-align: right;">${formatNum(site.Avg_DL_Throughput_Mbps)}</td>
+              <td style="padding: 6px; color: #cbd5e1;">User Count</td>
+              <td style="padding: 6px; color: #cbd5e1; text-align: right;">${site.User_Count || "-"}</td>
             </tr>
           </tbody>
         </table>
@@ -569,15 +583,18 @@ function updateMarkers() {
     `
 
     const popup = L.popup({ 
-      maxWidth: 450,
-      closeButton: true
+      maxWidth: 400,
+      closeButton: true,
+      autoPan: true,
+      autoPanPadding: [50, 50], // Add padding so popup doesn't get cut off
+      keepInView: true // Keep popup in view
     }).setContent(popupHtml)
     
     marker.bindPopup(popup)
 
     // Load trends in sidebar when marker is clicked
     marker.on("click", () => {
-      console.log("[..] Marker clicked:", site.eNodeB_Name)
+      console.log("[v0] Marker clicked:", site.eNodeB_Name)
       loadAndDisplayTrends(site)
     })
 
@@ -585,7 +602,7 @@ function updateMarkers() {
     markers.push(marker)
   })
 
-  console.log("[..] Displayed", markers.length, "markers")
+  console.log("[v0] Displayed", markers.length, "markers")
 
   if (markers.length > 0) {
     const group = L.featureGroup(markers)
@@ -595,7 +612,8 @@ function updateMarkers() {
     map.setView([7.8731, 80.7718], 8)
   }
 
-  map.setMaxBounds(sriLankaBounds)
+  // Don't enforce strict bounds to allow popups near edges to be visible
+  // map.setMaxBounds(sriLankaBounds)
 }
 
 // ============================
