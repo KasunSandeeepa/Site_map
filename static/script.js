@@ -321,15 +321,9 @@ function destroyCharts() {
 // Trend Loading (In Sidebar)
 // ============================
 function formatMonthLabel(label) {
-  // Convert "Jul-24" to "Jul" or "Jun-25" to "Jun"
-  // Handle various formats
+  // Just return the label as-is from backend (already formatted as "2024 April")
   if (!label) return label
-  
-  const parts = String(label).split('-')
-  if (parts.length >= 1) {
-    return parts[0] // Return just the month part
-  }
-  return label
+  return String(label).trim()
 }
 
 async function loadAndDisplayTrends(site) {
@@ -447,8 +441,10 @@ async function loadAndDisplayTrends(site) {
                 ticks: { 
                   color: "#94a3b8", 
                   font: { size: 9 }, 
-                  maxRotation: 0,
-                  minRotation: 0
+                  maxRotation: 45,
+                  minRotation: 45,
+                  autoSkip: true,
+                  maxTicksLimit: 18
                 },
               },
             },
@@ -495,8 +491,10 @@ async function loadAndDisplayTrends(site) {
                 ticks: { 
                   color: "#94a3b8", 
                   font: { size: 9 }, 
-                  maxRotation: 0,
-                  minRotation: 0
+                  maxRotation: 45,
+                  minRotation: 45,
+                  autoSkip: true,
+                  maxTicksLimit: 18
                 },
               },
             },
@@ -596,6 +594,15 @@ function updateMarkers() {
     marker.on("click", () => {
       console.log("[v0] Marker clicked:", site.eNodeB_Name)
       loadAndDisplayTrends(site)
+    })
+
+    // Clear trends when popup closes
+    marker.on("popupclose", () => {
+      console.log("[v0] Popup closed, hiding trends")
+      const trendsSection = document.getElementById("trendsSection")
+      trendsSection.style.display = "none"
+      destroyCharts()
+      currentSiteId = null
     })
 
     marker.addTo(map)

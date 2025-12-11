@@ -79,11 +79,21 @@ def load_trend_data():
                         and str(col).strip() != '']
         
         # Filter to only numeric columns (exclude non-numeric data columns)
-        month_columns = [col for col in month_columns 
-                        if traffic_df[col].dtype in ['int64', 'float64'] or 
-                        pd.to_numeric(traffic_df[col], errors='coerce').notna().any()]
+        numeric_month_columns = []
+        for col in month_columns:
+            if traffic_df[col].dtype in ['int64', 'float64']:
+                numeric_month_columns.append(col)
+            elif pd.to_numeric(traffic_df[col], errors='coerce').notna().any():
+                numeric_month_columns.append(col)
         
-        print(f"[v0] Found {len(month_columns)} month columns: {month_columns}")
+        month_columns = numeric_month_columns
+        
+        # Take only the LAST 12 months for traffic data
+        if len(month_columns) > 12:
+            month_columns = month_columns[-12:]
+            print(f"[v0] Limiting to last 12 months for traffic")
+        
+        print(f"[v0] Found {len(month_columns)} month columns (last 12): {month_columns}")
         
         for idx, row in traffic_df.iterrows():
             node_id = row.get('eNodeB ID')
@@ -99,16 +109,44 @@ def load_trend_data():
             if node_id_str not in trend_data:
                 trend_data[node_id_str] = {'traffic': {}, 'users': {}}
             
-            for month in month_columns:
-                value = row.get(month)
+            for month_col in month_columns:
+                value = row.get(month_col)
                 if pd.notna(value):
                     try:
                         num_val = float(value)
                         if num_val > 0:  # Only store positive values
-                            # Extract just the month part (e.g., "Jul-24" -> "Jul-24")
-                            month_label = str(month).strip()
+                            # Format the month label - handle datetime objects
+                            if isinstance(month_col, pd.Timestamp):
+                                # Format as "2024 July" 
+                                year = month_col.year
+                                month = month_col.strftime('%B')  # Full month name
+                                month_label = f"{year} {month}"
+                            elif hasattr(month_col, 'year'):
+                                # Another datetime-like object
+                                year = month_col.year
+                                month = month_col.strftime('%B')
+                                month_label = f"{year} {month}"
+                            else:
+                                # String - try to parse it
+                                month_str = str(month_col).strip()
+                                # Remove any time component if present
+                                if ' 00:00:00' in month_str:
+                                    month_str = month_str.split(' 00:00:00')[0]
+                                if 'T00:00:00' in month_str:
+                                    month_str = month_str.split('T')[0]
+                                
+                                # Try to parse as date
+                                try:
+                                    date_obj = pd.to_datetime(month_str)
+                                    year = date_obj.year
+                                    month = date_obj.strftime('%B')
+                                    month_label = f"{year} {month}"
+                                except:
+                                    month_label = month_str
+                            
                             trend_data[node_id_str]['traffic'][month_label] = int(num_val) if num_val == int(num_val) else num_val
-                    except (ValueError, TypeError):
+                    except (ValueError, TypeError) as e:
+                        print(f"[v0] Error processing value for {month_col}: {e}")
                         pass
         
         traffic_with_data = sum(1 for n in trend_data if len(trend_data[n]['traffic']) > 0)
@@ -132,11 +170,21 @@ def load_trend_data():
                        and str(col).strip() != '']
         
         # Filter to only numeric columns
-        month_columns = [col for col in month_columns 
-                       if user_df[col].dtype in ['int64', 'float64'] or 
-                       pd.to_numeric(user_df[col], errors='coerce').notna().any()]
+        numeric_month_columns = []
+        for col in month_columns:
+            if user_df[col].dtype in ['int64', 'float64']:
+                numeric_month_columns.append(col)
+            elif pd.to_numeric(user_df[col], errors='coerce').notna().any():
+                numeric_month_columns.append(col)
         
-        print(f"[v0] Found {len(month_columns)} month columns: {month_columns}")
+        month_columns = numeric_month_columns
+        
+        # Take only the LAST 6 months for user count data
+        if len(month_columns) > 6:
+            month_columns = month_columns[-6:]
+            print(f"[v0] Limiting to last 6 months for user count")
+        
+        print(f"[v0] Found {len(month_columns)} month columns (last 6): {month_columns}")
         
         for idx, row in user_df.iterrows():
             node_id = row.get('eNodeB ID')
@@ -152,15 +200,39 @@ def load_trend_data():
             if node_id_str not in trend_data:
                 trend_data[node_id_str] = {'traffic': {}, 'users': {}}
             
-            for month in month_columns:
-                value = row.get(month)
+            for month_col in month_columns:
+                value = row.get(month_col)
                 if pd.notna(value):
                     try:
                         num_val = float(value)
                         if num_val > 0:  # Only store positive values
-                            month_label = str(month).strip()
+                            # Format the month label - handle datetime objects
+                            if isinstance(month_col, pd.Timestamp):
+                                year = month_col.year
+                                month = month_col.strftime('%B')
+                                month_label = f"{year} {month}"
+                            elif hasattr(month_col, 'year'):
+                                year = month_col.year
+                                month = month_col.strftime('%B')
+                                month_label = f"{year} {month}"
+                            else:
+                                month_str = str(month_col).strip()
+                                if ' 00:00:00' in month_str:
+                                    month_str = month_str.split(' 00:00:00')[0]
+                                if 'T00:00:00' in month_str:
+                                    month_str = month_str.split('T')[0]
+                                
+                                try:
+                                    date_obj = pd.to_datetime(month_str)
+                                    year = date_obj.year
+                                    month = date_obj.strftime('%B')
+                                    month_label = f"{year} {month}"
+                                except:
+                                    month_label = month_str
+                            
                             trend_data[node_id_str]['users'][month_label] = int(num_val) if num_val == int(num_val) else num_val
-                    except (ValueError, TypeError):
+                    except (ValueError, TypeError) as e:
+                        print(f"[v0] Error processing value for {month_col}: {e}")
                         pass
         
         users_with_data = sum(1 for n in trend_data if len(trend_data[n]['users']) > 0)
