@@ -59,26 +59,47 @@ def load_sites():
         if site['Lat'] is not None and site['Lon'] is not None:
             sites.append(site)
     return sites
+
+def get_iso_date_str(col_name):
+    """Helper to convert various column header formats to ISO YYYY-MM-DD string for sorting"""
+    try:
+        # If it's already a Timestamp object
+        if isinstance(col_name, pd.Timestamp):
+            return col_name.strftime('%Y-%m-%d')
+        
+        # If it's a string, try to parse it
+        str_val = str(col_name).strip()
+        # Clean up common string artifacts
+        if ' 00:00:00' in str_val:
+            str_val = str_val.split(' 00:00:00')[0]
+        if 'T00:00:00' in str_val:
+            str_val = str_val.split('T')[0]
+            
+        return pd.to_datetime(str_val).strftime('%Y-%m-%d')
+    except:
+        # Fallback: return original string if parsing fails
+        return str(col_name).strip()
+
 def load_trend_data():
     """Load trend data from Excel sheets"""
     trend_data = {}
     
     try:
+        # ==========================================
         # Load Traffic Data
+        # ==========================================
         traffic_df = pd.read_excel(EXCEL_FILE, sheet_name=TREND_TRAFFIC_SHEET, engine='openpyxl')
         traffic_df = canonicalize_columns(traffic_df)
         print("[v0] ===== TRAFFIC SHEET DEBUG =====")
         print("[v0] All columns:", list(traffic_df.columns))
-        print("[v0] First few rows:")
-        print(traffic_df.head())
         
-        # Find month columns - look for patterns like "Jul-24", "Aug-24", etc.
+        # Find month columns
         month_columns = [col for col in traffic_df.columns 
                         if col not in ['eNodeB ID', 'eNodeB Name', 'Site Name', 'Site ID']
                         and not pd.isna(col)
                         and str(col).strip() != '']
         
-        # Filter to only numeric columns (exclude non-numeric data columns)
+        # Filter to only numeric columns
         numeric_month_columns = []
         for col in month_columns:
             if traffic_df[col].dtype in ['int64', 'float64']:
@@ -100,7 +121,7 @@ def load_trend_data():
             if pd.isna(node_id):
                 continue
             
-            # Normalize ID - convert to string, handle both int and string IDs
+            # Normalize ID
             try:
                 node_id_str = str(int(float(node_id))).strip()
             except (ValueError, TypeError):
@@ -115,53 +136,22 @@ def load_trend_data():
                     try:
                         num_val = float(value)
                         if num_val > 0:  # Only store positive values
-                            # Format the month label - handle datetime objects
-                            if isinstance(month_col, pd.Timestamp):
-                                # Format as "2024 July" 
-                                year = month_col.year
-                                month = month_col.strftime('%B')  # Full month name
-                                month_label = f"{year} {month}"
-                            elif hasattr(month_col, 'year'):
-                                # Another datetime-like object
-                                year = month_col.year
-                                month = month_col.strftime('%B')
-                                month_label = f"{year} {month}"
-                            else:
-                                # String - try to parse it
-                                month_str = str(month_col).strip()
-                                # Remove any time component if present
-                                if ' 00:00:00' in month_str:
-                                    month_str = month_str.split(' 00:00:00')[0]
-                                if 'T00:00:00' in month_str:
-                                    month_str = month_str.split('T')[0]
-                                
-                                # Try to parse as date
-                                try:
-                                    date_obj = pd.to_datetime(month_str)
-                                    year = date_obj.year
-                                    month = date_obj.strftime('%B')
-                                    month_label = f"{year} {month}"
-                                except:
-                                    month_label = month_str
-                            
-                            trend_data[node_id_str]['traffic'][month_label] = int(num_val) if num_val == int(num_val) else num_val
+                            # Use ISO date string as key to ensure correct sorting
+                            sort_key = get_iso_date_str(month_col)
+                            trend_data[node_id_str]['traffic'][sort_key] = int(num_val) if num_val == int(num_val) else num_val
                     except (ValueError, TypeError) as e:
-                        print(f"[v0] Error processing value for {month_col}: {e}")
                         pass
         
         traffic_with_data = sum(1 for n in trend_data if len(trend_data[n]['traffic']) > 0)
         print(f"[v0] Traffic: {traffic_with_data} nodes with data")
-        if traffic_with_data > 0:
-            sample_id = next(n for n in trend_data if len(trend_data[n]['traffic']) > 0)
-            print(f"[v0] Sample traffic data for ID {sample_id}: {trend_data[sample_id]['traffic']}")
-        
+
+        # ==========================================
         # Load User Data
+        # ==========================================
         user_df = pd.read_excel(EXCEL_FILE, sheet_name=TREND_USER_SHEET, engine='openpyxl')
         user_df = canonicalize_columns(user_df)
         print("[v0] ===== USER SHEET DEBUG =====")
         print("[v0] All columns:", list(user_df.columns))
-        print("[v0] First few rows:")
-        print(user_df.head())
         
         # Find month columns for user data
         month_columns = [col for col in user_df.columns 
@@ -206,40 +196,14 @@ def load_trend_data():
                     try:
                         num_val = float(value)
                         if num_val > 0:  # Only store positive values
-                            # Format the month label - handle datetime objects
-                            if isinstance(month_col, pd.Timestamp):
-                                year = month_col.year
-                                month = month_col.strftime('%B')
-                                month_label = f"{year} {month}"
-                            elif hasattr(month_col, 'year'):
-                                year = month_col.year
-                                month = month_col.strftime('%B')
-                                month_label = f"{year} {month}"
-                            else:
-                                month_str = str(month_col).strip()
-                                if ' 00:00:00' in month_str:
-                                    month_str = month_str.split(' 00:00:00')[0]
-                                if 'T00:00:00' in month_str:
-                                    month_str = month_str.split('T')[0]
-                                
-                                try:
-                                    date_obj = pd.to_datetime(month_str)
-                                    year = date_obj.year
-                                    month = date_obj.strftime('%B')
-                                    month_label = f"{year} {month}"
-                                except:
-                                    month_label = month_str
-                            
-                            trend_data[node_id_str]['users'][month_label] = int(num_val) if num_val == int(num_val) else num_val
+                            # Use ISO date string as key to ensure correct sorting
+                            sort_key = get_iso_date_str(month_col)
+                            trend_data[node_id_str]['users'][sort_key] = int(num_val) if num_val == int(num_val) else num_val
                     except (ValueError, TypeError) as e:
-                        print(f"[v0] Error processing value for {month_col}: {e}")
                         pass
         
         users_with_data = sum(1 for n in trend_data if len(trend_data[n]['users']) > 0)
         print(f"[v0] User: {users_with_data} nodes with data")
-        if users_with_data > 0:
-            sample_id = next(n for n in trend_data if len(trend_data[n]['users']) > 0)
-            print(f"[v0] Sample user data for ID {sample_id}: {trend_data[sample_id]['users']}")
         
         print(f"[v0] ===== FINAL: {len(trend_data)} total nodes in cache =====")
         
@@ -436,7 +400,6 @@ def get_site_trends(site_id):
             site_id_lookup = str(site_id).strip()
         
         print(f"[..] Trend lookup for site_id={site_id}, normalized={site_id_lookup}")
-        print(f"[..] Available keys sample: {list(trend_data_cache.keys())[:10]}")
         
         # Check if ID exists in cache
         if site_id_lookup not in trend_data_cache:
@@ -448,14 +411,22 @@ def get_site_trends(site_id):
         
         trend_info = trend_data_cache.get(site_id_lookup, {'traffic': {}, 'users': {}})
         
-        print(f"[..] Found traffic points: {len(trend_info['traffic'])}, user points: {len(trend_info['users'])}")
-        
+        # Helper to format ISO date string "YYYY-MM-DD" back to "YYYY Month" for frontend display
+        def format_for_frontend(iso_date_str):
+            try:
+                dt = pd.to_datetime(iso_date_str)
+                return dt.strftime('%Y %B')
+            except:
+                return iso_date_str
+
+        # Sort by the ISO date key (chronologically correct), then format label
         traffic_trend = [
-            {'period': period, 'value': value} 
+            {'period': format_for_frontend(period), 'value': value} 
             for period, value in sorted(trend_info['traffic'].items())
         ]
+        
         user_trend = [
-            {'period': period, 'value': value} 
+            {'period': format_for_frontend(period), 'value': value} 
             for period, value in sorted(trend_info['users'].items())
         ]
         
